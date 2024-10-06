@@ -4,6 +4,7 @@ import time
 import hashlib
 import hmac
 from dotenv import load_dotenv
+import math
 
 # 환경 변수 로드
 load_dotenv()
@@ -16,6 +17,28 @@ BYBIT_SECRET_KEY = os.getenv("BYBIT_SECRET_KEY")
 def create_signature(api_key, secret, params):
     query_string = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
     return hmac.new(bytes(secret, 'utf-8'), bytes(query_string, 'utf-8'), hashlib.sha256).hexdigest()
+
+# Bybit V2 API 서버 시간 조회 함수
+def get_server_time():
+    try:
+        url = "https://api.bybit.com/v2/public/time"
+        response = requests.get(url)
+        
+        pass
+        if response.status_code == 200:
+            server_time = response.json()['time_now']
+            server_time_ms = int(float(server_time) * 1000)
+            print(f"서버 시간: {server_time_ms}")
+            return server_time_ms
+        else:
+            print(f"서버 시간 조회 중 오류 발생: {response.status_code}, {response.text}")
+            return None
+    except Exception as e:
+        print(f"서버 시간 조회 중 오류 발생: {e}")
+        return None
+
+
+
 
 # 현재 레버리지 조회 함수
 def get_leverage(symbol, category='linear'):
@@ -115,67 +138,61 @@ def set_leverage(symbol, leverage, category='linear'):
 # USDT 기준으로 BTC 수량 계산 함수
 def calculate_amount(usdt_amount, leverage, current_price):
     try:
-        # USDT 기준으로 BTC 수량 계산 (레버리지 적용)
-        amount = (usdt_amount / current_price) * leverage
-        return round(amount, 6)  # 소수점 6자리까지 반올림 (BTC 수량은 소수점 사용)
-    
+        # 레버리지 적용 후 거래할 수 있는 USDT 금액
+        target_investment = usdt_amount * leverage
+        
+        # USDT 기준으로 BTC 수량 계산 (소수점 3자리까지 버림)
+        raw_amount = target_investment / current_price
+        amount = math.floor(raw_amount * 1000) / 1000  # 소수점 3자리까지 버림
+        if amount < 0.001:  # 최소 수량 제한을 예로 들어 0.001로 설정
+            print("오류: 최소 주문 수량을 충족하지 않습니다.")
+            return None
+        
+        return amount
     except Exception as e:
         print(f"amount 계산 중 오류 발생: {e}")
         return None
 
 # Bybit V5 API 주문 생성 함수 (TP/SL 포함)
-def create_order_with_tp_sl(symbol, side,current_price, usdt_amount, leverage=100, price=None, tp_rate=0.20, sl_rate=0.20):
+def create_order_with_tp_sl(symbol, side, current_price, usdt_amount, leverage=100, price=None, tp_rate=0.20, sl_rate=0.20):
     try:
         # 주문할 BTC 수량 계산 (USDT 기준)
         amount = calculate_amount(usdt_amount, leverage, current_price)
         if amount is None:
-            print("BTC 수량 계산 실패")
+            print("BTC 수량이 유효하지 않습니다. 주문을 생성하지 않습니다.")
             return None
 
         # Bybit V5 API 주문 엔드포인트
         url = "https://api.bybit.com/v5/order/create"
-        timestamp = int(time.time() * 1000)
+
+        # 서버 시간 가져오기 (V2 API 사용)
+        server_time = get_server_time()
+        timestamp = server_time if server_time else int(time.time() * 1000)
 
         # 주문 기본 파라미터
         params = {
             'api_key': BYBIT_ACCESS_KEY,
-            'symbol': symbol,  # 예: 'BTCUSDT'
-            'side': side.capitalize(),  # 'Buy' 또는 'Sell'
-            'orderType': 'Limit' if price else 'Market',  # 'Limit' 또는 'Market'
-            'qty': amount,  # 계산된 BTC 수량
-            'category': 'linear',  # 선물 거래 유형 (linear: USDT 기반)
-            'leverage': leverage,  # 레버리지 설정
+            'symbol': symbol,
+            'side': side.capitalize(),
+            'orderType': 'Limit' if price else 'Market',
+            'qty': amount,
+            'category': 'linear',
+            'leverage': leverage,
             'timestamp': timestamp,
-            'recv_window': 60000  # 60초의 recv_window 설정
+            'recv_window': 5000
         }
 
-        # 가격 지정 (지정가 주문일 경우)
+        # 지정가 주문일 경우 price 설정
         if price:
             params['price'] = price
 
-        # TP/SL 설정 (시장가 기준)
-        ticker_url = f"https://api.bybit.com/v5/market/tickers?symbol={symbol}"
-        ticker_response = requests.get(ticker_url).json()
-
-
-
-
-        pass # 주문 생성 중 오류 발생: list index out of range 이 아래에 있는게 문제 있는듯? 리스트는 여기서부터니까
-        entry_price = float(ticker_response['result']['list'][0]['lastPrice']) if not price else price
-
-
-
-
-
-
-        # 테이크 프로핏 (TP) 설정
+        # TP/SL 설정
         if tp_rate:
-            tp_price = entry_price * (1 + (tp_rate / leverage)) if side.lower() == 'buy' else entry_price * (1 - (tp_rate / leverage))
+            tp_price = current_price * (1 + (tp_rate / leverage)) if side.lower() == 'buy' else current_price * (1 - (tp_rate / leverage))
             params['takeProfit'] = round(tp_price, 2)
 
-        # 스톱 로스 (SL) 설정
         if sl_rate:
-            sl_price = entry_price * (1 - (sl_rate / leverage)) if side.lower() == 'buy' else entry_price * (1 + (sl_rate / leverage))
+            sl_price = current_price * (1 - (sl_rate / leverage)) if side.lower() == 'buy' else current_price * (1 + (sl_rate / leverage))
             params['stopLoss'] = round(sl_price, 2)
 
         # 서명 생성
@@ -198,6 +215,7 @@ def create_order_with_tp_sl(symbol, side,current_price, usdt_amount, leverage=10
     except Exception as e:
         print(f"주문 생성 중 오류 발생: {e}")
         return None
+
 
 # 현재 포지션 정보 조회 함수 (Bybit V5 API)
 def get_position_amount(symbol):
@@ -298,5 +316,6 @@ if __name__ == "__main__":
     leverage = 100
     initial_usdt_amount = 1  # 초기 투자금
 
-    set_leverage(symbol, leverage)
+    # set_leverage(symbol, leverage)
+    get_server_time()
 
