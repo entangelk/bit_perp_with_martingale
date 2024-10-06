@@ -1,7 +1,7 @@
 from docs.get_chart import chart_update
 from docs.get_current import fetch_investment_status
 from docs.making_order import set_leverage,create_order_with_tp_sl,close_position
-from docs.openai_utils import ai_choise
+from docs.openai_utils import ai_choice
 from docs.cal_pnl import cal_pnl
 
 import time
@@ -11,7 +11,7 @@ import schedule
 # 초기 설정
 symbol = "BTC/USDT"
 leverage = 100
-initial_usdt_amount = 10  # 초기 투자금
+initial_usdt_amount = 1  # 초기 투자금
 usdt_amount = initial_usdt_amount  # 현재 투자 금액
 max_martingale_steps = 5  # 마틴게일 최대 단계 설정
 current_step = 0  # 현재 마틴게일 단계
@@ -53,7 +53,7 @@ def execute_trading():
             current_step = 0
 
         # 매수 또는 매도 결정
-        side = ai_choise(current_price)
+        side,decision = ai_choice(current_price)
 
         # 레버리지 설정
         leverage_response = set_leverage(symbol, leverage)
@@ -92,7 +92,7 @@ def execute_trading():
             print("포지션 종료 성공")
 
             # 새로 매수 또는 매도 방향 결정 (기존 투자금 유지)
-            side = ai_choise(current_price)
+            side,decision = ai_choice(current_price)
 
             # 동일한 투자금으로 새로운 주문 생성
             order_quantity = (usdt_amount / current_price) * leverage
@@ -114,6 +114,9 @@ def execute_trading():
         else:
             # 손실 발생 시 포지션 유지
             print("손실 발생 중, 포지션 유지.")
+
+    return side,decision
+            
             
 # 5분마다 실행하는 함수 (schedule 라이브러리 사용)
 def schedule_trading():
@@ -123,6 +126,12 @@ def schedule_trading():
         schedule.run_pending()
         time.sleep(1)
 
+
+if __name__ == "__main__":
+    side,decision = execute_trading()
+    print(f"Position: {side}, Decision: {decision}")
+    
+
 # 트레이딩 스케줄 실행
-schedule_trading()
+# schedule_trading()
 
