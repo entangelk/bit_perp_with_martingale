@@ -9,7 +9,7 @@ import json
 import schedule
 
 # 초기 설정
-symbol = "BTC/USDT"
+symbol = "BTCUSDT"
 leverage = 100
 initial_usdt_amount = 1  # 초기 투자금
 usdt_amount = initial_usdt_amount  # 현재 투자 금액
@@ -60,20 +60,18 @@ def execute_trading():
         if leverage_response is None:
             print("레버리지 설정 실패. 주문 생성을 중단합니다.")
         else:
-            # 주문 수량 계산 (USDT 기준)
-            order_quantity = (usdt_amount / current_price) * leverage
 
             # 주문 생성 함수 호출
             order_response = create_order_with_tp_sl(
                 symbol=symbol,  # 거래할 심볼 (예: 'BTC/USDT')
                 side=side,  # 'buy' 또는 'sell'
-                amount=order_quantity,  # 주문 수량
+                usdt_amount=usdt_amount,  # 주문 수량
                 leverage=leverage,  # 레버리지 100배
                 price=None,  # 시장가 주문
                 tp_rate=0.20,  # 목표 수익률 20%
-                sl_rate=0.20  # 목표 손실률 20%
+                sl_rate=0.20,  # 목표 손실률 20%
+                current_price = current_price # 현재 가격
             )
-
             if order_response is None:
                 print("주문 생성 실패.")
             else:
@@ -88,22 +86,23 @@ def execute_trading():
         # 이익이 발생한 경우: 포지션 종료 후 새로운 주문 생성
         if total_pnl > 0:
             # 기존 포지션 종료
-            close_position(symbol=symbol, side=side, amount=order_quantity)
+            close_position(symbol=symbol, side=side, amount=usdt_amount)
             print("포지션 종료 성공")
 
             # 새로 매수 또는 매도 방향 결정 (기존 투자금 유지)
             side,decision = ai_choice(current_price)
 
             # 동일한 투자금으로 새로운 주문 생성
-            order_quantity = (usdt_amount / current_price) * leverage
             order_response = create_order_with_tp_sl(
                 symbol=symbol,  # 거래할 심볼 (예: 'BTC/USDT')
                 side=side,  # 'buy' 또는 'sell'
-                amount=order_quantity,  # 기존 투자금으로 수량 계산
+                usdt_amount=usdt_amount,  # 기존 투자금으로 수량 계산
                 leverage=leverage,  # 레버리지 100배
                 price=None,  # 시장가 주문
                 tp_rate=0.20,  # 목표 수익률 20%
-                sl_rate=0.20  # 목표 손실률 20%
+                sl_rate=0.20,  # 목표 손실률 20%
+                current_price = current_price # 현재 가격
+
             )
 
             if order_response is None:
