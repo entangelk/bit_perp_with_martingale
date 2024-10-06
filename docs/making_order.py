@@ -36,40 +36,71 @@ def set_leverage(symbol, leverage):
         print(f"레버리지 설정 중 오류 발생: {e}")
         return None
 
-# 주문을 생성하는 함수 (TP/SL 포함)
-def create_order_with_tp_sl(symbol, side, amount, price=None, tp_price=None, sl_price=None):
+def create_order_with_tp_sl(symbol, side, amount, leverage=100, price=None, tp_rate=0.20, sl_rate=0.20):
     try:
+        # 주문 타입 결정 (지정가 또는 시장가)
+        order_type = 'limit' if price else 'market'
+
+        # 주문 기본 파라미터
         params = {
-            'symbol': symbol.replace('/', ''),  # Bybit 형식에 맞춰 변환
-            'side': 'Buy' if side.lower() == 'buy' else 'Sell',  # 'Buy' 또는 'Sell'
-            'qty': amount,
-            'order_type': 'Limit' if price else 'Market',  # 지정가 또는 시장가 주문
-            'reduce_only': False,  # 감축 주문 여부
-            'close_on_trigger': False,  # 트리거 발생 시 포지션 종료
-            'time_in_force': 'GoodTillCancel'  # 주문 지속시간
+            'symbol': symbol,  # 예: 'BTC/USDT'
+            'side': side.lower(),  # 'buy' 또는 'sell'
+            'amount': amount,
+            'type': order_type,  # 'limit' 또는 'market'
         }
 
         # 지정가 주문일 경우 가격 추가
         if price:
             params['price'] = price
         
-        # Take Profit 설정
-        if tp_price:
-            params['take_profit'] = tp_price
-        
-        # Stop Loss 설정
-        if sl_price:
-            params['stop_loss'] = sl_price
+        # 진입 가격을 기준으로 TP/SL을 수익률로 설정
+        if price:
+            entry_price = price  # 지정가일 경우 입력된 price 사용
+        else:
+            # 시장가 주문이라면, 현재 시장 가격을 기준으로 설정해야 함
+            ticker = exchange.fetch_ticker(symbol)
+            entry_price = ticker['last']  # 시장가의 현재 가격
 
-        # 주문 생성
-        order = exchange.private_post_order_create(params)
-        print("주문 생성 성공 (TP/SL 포함):")
+        # TP/SL이 수익률로 제공될 경우 레버리지 고려하여 계산
+        if tp_rate or sl_rate:
+            params['params'] = {}
+
+        # TP(테이크 프로핏) 수익률 설정 (레버리지 100배 반영)
+        if tp_rate:
+            # 수익률을 레버리지로 고려하여 목표 가격 계산 (0.2% 변화)
+            if side.lower() == 'buy':
+                tp_price = entry_price * (1 + (tp_rate / leverage))
+            else:
+                tp_price = entry_price * (1 - (tp_rate / leverage))
+            params['params']['takeProfitPrice'] = tp_price
+        
+        # SL(스톱 로스) 수익률 설정 (레버리지 100배 반영)
+        if sl_rate:
+            # 손실률을 레버리지로 고려하여 목표 가격 계산 (0.2% 변화)
+            if side.lower() == 'buy':
+                sl_price = entry_price * (1 - (sl_rate / leverage))
+            else:
+                sl_price = entry_price * (1 + (sl_rate / leverage))
+            params['params']['stopLossPrice'] = sl_price
+
+        # CCXT에서 주문 생성
+        order = exchange.create_order(
+            symbol=params['symbol'], 
+            type=params['type'], 
+            side=params['side'], 
+            amount=params['amount'], 
+            price=params.get('price'), 
+            params=params.get('params')
+        )
+
+        print("주문 생성 성공 (TP/SL 포함, 레버리지 100배 고려):")
         print(order)
         return order
 
     except Exception as e:
         print(f"주문 생성 중 오류 발생: {e}")
         return None
+
 
 # 포지션을 청산하는 (시장가로 닫는) 함수
 def close_position(symbol, side, amount):
