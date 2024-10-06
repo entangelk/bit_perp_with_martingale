@@ -247,8 +247,9 @@ def get_position_amount(symbol):
             if position_data['result']['list']:
                 position = position_data['result']['list'][0]
                 amount = float(position['size'])  # 포지션 수량 추출
+                side = position['side']
                 print(f"현재 포지션 수량: {amount}")
-                return amount
+                return amount,side
             else:
                 print("열린 포지션이 없습니다.")
                 return None
@@ -260,32 +261,33 @@ def get_position_amount(symbol):
         print(f"포지션 조회 중 오류 발생: {e}")
         return None
 
-
-# Bybit V5 API 포지션 청산 함수 (시장가로 닫기)
-def close_position(symbol, side):
+def close_position(symbol):
     try:
-        # 현재 포지션의 수량 조회
-        amount = get_position_amount(symbol)
+        # 현재 포지션의 방향, 수량 조회
+        amount,side = get_position_amount(symbol)
         if amount is None or amount == 0:
             print("청산할 포지션이 없습니다.")
             return None
 
         # Bybit V5 API 포지션 청산 엔드포인트
         url = "https://api.bybit.com/v5/order/create"
-        timestamp = int(time.time() * 1000)
+        
+        # 서버 시간 가져오기
+        server_time = get_server_time()
+        timestamp = server_time if server_time else int(time.time() * 1000)
 
-        # 반대 포지션으로 청산
-        opposite_side = 'Sell' if side.lower() == 'buy' else 'Buy'
+        # 반대 포지션으로 설정하여 청산 주문 생성
+        opposite_side = 'Sell' if side == 'Buy' else 'Buy'
         params = {
             'api_key': BYBIT_ACCESS_KEY,
             'symbol': symbol,
-            'side': opposite_side,  # 'Sell' 또는 'Buy'
-            'orderType': 'Market',  # 시장가로 청산
-            'qty': amount,  # 청산할 수량 (조회된 포지션 수량 사용)
-            'category': 'linear',  # 선물 거래 유형 (USDT 기반)
-            'timestamp': timestamp,
-            'recv_window': 60000,
-            'reduceOnly': True  # 포지션을 줄이기 위해 설정
+            'side': opposite_side,  # 'Buy' 또는 'Sell'만 사용
+            'orderType': 'Market',
+            'qty': str(amount),
+            'category': 'linear',
+            'reduceOnly': 'true',
+            'timestamp': str(timestamp),
+            'recv_window': '60000'
         }
 
         # 서명 생성
@@ -293,8 +295,8 @@ def close_position(symbol, side):
         params['sign'] = signature
 
         # Bybit V5 API 요청
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response = requests.post(url, headers=headers, data=params)
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url, headers=headers, json=params)
 
         # 응답 처리
         if response.status_code == 200:
@@ -310,12 +312,15 @@ def close_position(symbol, side):
         return None
 
 
+
+
+
 if __name__ == "__main__":
     # 초기 설정
     symbol = "BTCUSDT"
     leverage = 100
     initial_usdt_amount = 1  # 초기 투자금
-
+    side = 'buy'
     # set_leverage(symbol, leverage)
-    get_server_time()
-
+    # get_server_time()
+    close_position(symbol)

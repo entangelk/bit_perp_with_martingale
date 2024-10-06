@@ -81,7 +81,7 @@ def execute_trading():
         positions_data = json.loads(positions_json)
         check_fee = float(positions_data[0]['info']['curRealisedPnl'])
         check_nowPnL = float(positions_data[0]['info']['unrealizedPnl'])
-        total_pnl = check_nowPnL - check_fee
+        total_pnl = check_nowPnL - (check_fee*2)
 
         # 이익이 발생한 경우: 포지션 종료 후 새로운 주문 생성
         if total_pnl > 0:
