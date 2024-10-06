@@ -34,7 +34,9 @@ def ai_choice(current_price):
             },
             {
                 "role": "user",
-                "content": f"""
+                "content": [
+                    { "type" : "text",
+                        "text" :f"""
                 The current price of Bitcoin (BTC/USDT) is: {current_price} USDT.
 
                 Below are the most recent technical analysis data across different time intervals. Each dataset includes OHLCV (Open, High, Low, Close, Volume) data with additional indicators:
@@ -50,14 +52,30 @@ def ai_choice(current_price):
 
                 Please specify your recommendation as either **buy** or **sell** and provide a brief explanation for your decision based on the provided data.
                 """
-            }
-        ],
-        max_tokens=4095,  # 최대 토큰 수 제한
-        temperature=0.5  # 응답의 다양성 제어
-    )
+            },]}
+        ], 
+        response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "trading_decision",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "position": {"type": "string", "enum": ["buy", "sell"]},
+                            "decision": {"type": "string"}
+                        },
+                        "required": ["position","decision"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            max_tokens=4095,  # 최대 토큰 수 제한
+            temperature=0.5,  # 응답의 다양성 제어
+        )
 
     # 응답의 텍스트를 JSON 형식으로 변환
-    response_content = response.choices[0].message["content"]
+    response_content = response.choices[0].message.content
     response_json = json.loads(response_content)
 
     # 포지션 및 결정을 추출
