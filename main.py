@@ -80,13 +80,13 @@ def execute_trading():
         # 포지션이 있을 경우 이익 또는 손실을 확인
         positions_data = json.loads(positions_json)
         check_fee = float(positions_data[0]['info']['curRealisedPnl'])
-        check_nowPnL = float(positions_data[0]['info']['unrealizedPnl'])
+        check_nowPnL = float(positions_data[0]['info']['unrealisedPnl'])
         total_pnl = check_nowPnL - (check_fee*2)
 
         # 이익이 발생한 경우: 포지션 종료 후 새로운 주문 생성
         if total_pnl > 0:
             # 기존 포지션 종료
-            close_position(symbol=symbol, side=side, amount=usdt_amount)
+            close_position(symbol=symbol)
             print("포지션 종료 성공")
 
             # 새로 매수 또는 매도 방향 결정 (기존 투자금 유지)
@@ -127,8 +127,12 @@ def schedule_trading():
 
 
 if __name__ == "__main__":
-    side,decision = execute_trading()
-    print(f"Position: {side}, Decision: {decision}")
+    for i in range(5):
+        print(f"\n실행 {i+1}/5")
+        side, decision = execute_trading()
+        print(f"Position: {side}, Decision: {decision}")
+        time.sleep(300)  # 5분(300초) 대기
+
     
 
 # 트레이딩 스케줄 실행
