@@ -38,12 +38,6 @@ def chart_update():
     server_datetime = datetime.utcfromtimestamp(server_time)
     print(f"서버 시간 (UTC): {server_datetime}")
 
-    # 현재 비트코인 가격을 가져오는 함수
-    def get_current_price(symbol):
-        ticker = bybit.fetch_ticker(symbol)
-        current_price = ticker['last']  # 마지막 거래 가격 (현재 가격)
-        print(f"현재 {symbol} 가격: {current_price}")
-        return current_price
 
     def fetch_and_store_ohlcv(collection, timeframe, symbol, limit, minutes_per_unit, time_description):
         # MongoDB에서 마지막으로 저장된 데이터의 타임스탬프 찾기
@@ -91,9 +85,6 @@ def chart_update():
     # 심볼 설정
     symbol = 'BTC/USDT'
 
-    # 현재 비트코인 가격 가져오기 (이 부분을 추가)
-    current_price = get_current_price(symbol)
-
     # 1분봉 (최근 1440틱 데이터 저장 및 업데이트)
     fetch_and_store_ohlcv(chart_collection_1m, '1m', symbol, limit=1440, minutes_per_unit=1, time_description="1분봉")
 
@@ -110,8 +101,8 @@ def chart_update():
     fetch_and_store_ohlcv(chart_collection_30d, '1d', symbol, limit=60, minutes_per_unit=1440, time_description="1일봉")
 
     pass
-    # 현재 가격 반환
-    return current_price
+
+    return 
 
 if __name__ == "__main__":
     chart_update()

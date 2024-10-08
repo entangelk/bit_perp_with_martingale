@@ -3,6 +3,7 @@ from docs.get_current import fetch_investment_status
 from docs.making_order import set_leverage, create_order_with_tp_sl, close_position
 from docs.openai_utils import ai_choice
 from docs.cal_pnl import cal_pnl
+from docs.current_price import get_current_price
 
 import time
 import json
@@ -20,8 +21,8 @@ current_step = 0  # 현재 마틴게일 단계
 def execute_trading():
     global usdt_amount, current_step
 
-    # 차트 업데이트, 현재 가격 불러오기
-    current_price = chart_update()
+    # 차트 업데이트
+    chart_update()
 
     # 내 포지션 정보 가져오기
     balance, positions_json, ledger = fetch_investment_status()
@@ -57,6 +58,9 @@ def execute_trading():
             usdt_amount = initial_usdt_amount
             current_step = 0
 
+        # 현재 가격 불러오기
+        current_price = get_current_price(symbol=symbol)
+
         # 매수 또는 매도 결정
         side, decision = ai_choice(current_price)
 
@@ -71,6 +75,8 @@ def execute_trading():
             print("레버리지 설정 실패. 주문 생성을 중단합니다.")
         else:
             # 주문 생성 함수 호출
+            current_price = get_current_price(symbol=symbol)
+
             order_response = create_order_with_tp_sl(
                 symbol=symbol,  # 거래할 심볼 (예: 'BTC/USDT')
                 side=side,  # 'buy' 또는 'sell'
@@ -98,6 +104,8 @@ def execute_trading():
             print("포지션 종료 성공")
 
             # 새로 매수 또는 매도 방향 결정 (기존 투자금 유지)
+            current_price = get_current_price(symbol=symbol)
+
             side, decision = ai_choice(current_price)
             
             # 'stay'가 반환되면 주문 생성을 중단하고 함수 종료
@@ -106,6 +114,8 @@ def execute_trading():
                 return None, None
 
             # 동일한 투자금으로 새로운 주문 생성
+            current_price = get_current_price(symbol=symbol)
+
             order_response = create_order_with_tp_sl(
                 symbol=symbol,  # 거래할 심볼 (예: 'BTC/USDT')
                 side=side,  # 'buy' 또는 'sell'
@@ -137,8 +147,9 @@ def schedule_trading():
 
 
 if __name__ == "__main__":
-    for i in range(12):
-        print(f"\n실행 {i+1}/5")
+    test_count = 12
+    for i in range(test_count):
+        print(f"\n실행 {i+1}/{test_count}")
         side, decision = execute_trading()
         print(f"Position: {side}, Decision: {decision}")
         time.sleep(300)  # 5분(300초) 대기

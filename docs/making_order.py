@@ -209,27 +209,44 @@ def create_order_with_tp_sl(symbol, side, current_price, usdt_amount, leverage=1
 def set_tp_sl(symbol, side, fill_price, leverage, tp_rate, sl_rate):
     try:
         # TP 및 SL 가격 계산
+        tp_price = None
+        sl_price = None
+
         if tp_rate:
             tp_price = fill_price * (1 + (tp_rate / leverage)) if side.lower() == 'buy' else fill_price * (1 - (tp_rate / leverage))
         if sl_rate:
             sl_price = fill_price * (1 - (sl_rate / leverage)) if side.lower() == 'buy' else fill_price * (1 + (sl_rate / leverage))
 
-        # TP/SL 설정 엔드포인트
+        server_time = get_server_time()
+        timestamp = server_time if server_time else int(time.time() * 1000)
+        # TP/SL 설정 파라미터
         tp_sl_params = {
             'api_key': BYBIT_ACCESS_KEY,
             'symbol': symbol,
-            'takeProfit': round(tp_price, 2),
-            'stopLoss': round(sl_price, 2),
-            'timestamp': int(time.time() * 1000),
+            'category': 'linear',  # USDT perpetual 기준
+            'tpslMode': 'Full',  # 전체 포지션에 대해 TP/SL 설정
+            'positionIdx': 0,  # 기본 포지션 모드 설정
+            'timestamp': timestamp,
             'recv_window': 5000
         }
+
+        # 옵션별 TP 및 SL 추가
+        if tp_price is not None:
+            tp_sl_params['takeProfit'] = str(round(tp_price, 2))
+        if sl_price is not None:
+            tp_sl_params['stopLoss'] = str(round(sl_price, 2))
 
         # 서명 생성
         signature = create_signature(BYBIT_ACCESS_KEY, BYBIT_SECRET_KEY, tp_sl_params)
         tp_sl_params['sign'] = signature
-        tp_sl_url = "https://api.bybit.com/v5/order/set-tpsl"
-        tp_sl_response = requests.post(tp_sl_url, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=tp_sl_params)
 
+        # 엔드포인트 URL
+        tp_sl_url = "https://api.bybit.com/v5/position/trading-stop"
+        
+        # API 요청
+        tp_sl_response = requests.post(tp_sl_url, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=tp_sl_params)
+        pass
+        # 응답 처리
         if tp_sl_response.status_code == 200:
             print("TP/SL 설정 성공!")
         else:
@@ -347,8 +364,8 @@ if __name__ == "__main__":
     symbol = "BTCUSDT"
     leverage = 100
     initial_usdt_amount = 1  # 초기 투자금
-    side = 'sell'
-    avgPrice=62685.8
+    side = 'Buy'
+    avgPrice=62404.70
     tp_rate = 0.2
     sl_rate = 0.2
     # set_leverage(symbol, leverage)

@@ -18,11 +18,11 @@ def ai_choice(current_price):
     df_1m, df_5m, df_15m, df_1h, df_30d = cal_chart()
 
     # 각 데이터프레임을 JSON 형식으로 변환
-    df_1m_json = df_1m[-50:].to_json()  # 최근 50개의 1분봉 데이터
-    df_5m_json = df_5m[-50:].to_json()  # 최근 50개의 5분봉 데이터
-    df_15m_json = df_15m[-50:].to_json()  # 최근 50개의 15분봉 데이터
-    df_1h_json = df_1h[-12:].to_json()  # 최근 12개의 1시간봉 데이터
-    df_30d_json = df_30d[-30:].to_json()  # 최근 30일의 일간 데이터
+    df_1m_json = df_1m[-100:].to_json()  # 최근 50개의 1분봉 데이터
+    df_5m_json = df_5m[-40:].to_json()  # 최근 50개의 5분봉 데이터
+    df_15m_json = df_15m[-30:].to_json()  # 최근 50개의 15분봉 데이터
+    df_1h_json = df_1h[-24:].to_json()  # 최근 12개의 1시간봉 데이터
+    df_30d_json = df_30d[-5:].to_json()  # 최근 5일의 일간 데이터
 
     # GPT 모델에 기술적 분석 및 시장 상황 전달
     response = client.chat.completions.create(
