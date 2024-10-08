@@ -1,6 +1,6 @@
 from docs.get_chart import chart_update
 from docs.get_current import fetch_investment_status
-from docs.making_order import set_leverage,create_order_with_tp_sl,close_position
+from docs.making_order import set_leverage, create_order_with_tp_sl, close_position
 from docs.openai_utils import ai_choice
 from docs.cal_pnl import cal_pnl
 
@@ -11,9 +11,9 @@ import schedule
 # 초기 설정
 symbol = "BTCUSDT"
 leverage = 100
-initial_usdt_amount = 1  # 초기 투자금
+initial_usdt_amount = 10  # 초기 투자금
 usdt_amount = initial_usdt_amount  # 현재 투자 금액
-max_martingale_steps = 5  # 마틴게일 최대 단계 설정
+max_martingale_steps = 1  # 마틴게일 최대 단계 설정
 current_step = 0  # 현재 마틴게일 단계
 
 # 마틴게일 전략 실행 함수
@@ -28,13 +28,18 @@ def execute_trading():
 
     # 포지션 상태 저장 (포지션이 open 상태일경우 True)
     positions_flag = True
-    if positions_json == '[]' or positions_json == None:
+    if positions_json == '[]' or positions_json is None:
         positions_flag = False
 
     # 마지막 거래 성공 여부 저장 (성공했을 시 True)
     trading_result = True 
 
     if not positions_flag:  # 포지션이 없을 때, 즉 새로운 거래를 생성할 때
+        # 마지막 거래의 결과와 관계없이 초기화 (처음 실행할 때만)
+        if current_step == 0:
+            usdt_amount = initial_usdt_amount
+            current_step = 0
+
         final_result = cal_pnl(ledger)
         
         # 마지막 거래 실패 여부 확인
@@ -53,24 +58,27 @@ def execute_trading():
             current_step = 0
 
         # 매수 또는 매도 결정
-        side,decision = ai_choice(current_price)
+        side, decision = ai_choice(current_price)
+
+        # 'stay'가 반환되면 주문 생성을 중단하고 함수 종료
+        if side == 'stay':
+            print("stay 상태입니다. 다음 턴까지 대기합니다.")
+            return None, None
 
         # 레버리지 설정
         leverage_response = set_leverage(symbol, leverage)
         if leverage_response is None:
             print("레버리지 설정 실패. 주문 생성을 중단합니다.")
         else:
-
             # 주문 생성 함수 호출
             order_response = create_order_with_tp_sl(
                 symbol=symbol,  # 거래할 심볼 (예: 'BTC/USDT')
                 side=side,  # 'buy' 또는 'sell'
                 usdt_amount=usdt_amount,  # 주문 수량
                 leverage=leverage,  # 레버리지 100배
-                price=None,  # 시장가 주문
                 tp_rate=0.20,  # 목표 수익률 20%
                 sl_rate=0.20,  # 목표 손실률 20%
-                current_price = current_price # 현재 가격
+                current_price=current_price  # 현재 가격
             )
             if order_response is None:
                 print("주문 생성 실패.")
@@ -81,7 +89,7 @@ def execute_trading():
         positions_data = json.loads(positions_json)
         check_fee = float(positions_data[0]['info']['curRealisedPnl'])
         check_nowPnL = float(positions_data[0]['info']['unrealisedPnl'])
-        total_pnl = check_nowPnL - (check_fee*2)
+        total_pnl = check_nowPnL - (check_fee * 2)
 
         # 이익이 발생한 경우: 포지션 종료 후 새로운 주문 생성
         if total_pnl > 0:
@@ -90,7 +98,12 @@ def execute_trading():
             print("포지션 종료 성공")
 
             # 새로 매수 또는 매도 방향 결정 (기존 투자금 유지)
-            side,decision = ai_choice(current_price)
+            side, decision = ai_choice(current_price)
+            
+            # 'stay'가 반환되면 주문 생성을 중단하고 함수 종료
+            if side == 'stay':
+                print("stay 상태입니다. 다음 턴까지 대기합니다.")
+                return None, None
 
             # 동일한 투자금으로 새로운 주문 생성
             order_response = create_order_with_tp_sl(
@@ -98,11 +111,9 @@ def execute_trading():
                 side=side,  # 'buy' 또는 'sell'
                 usdt_amount=usdt_amount,  # 기존 투자금으로 수량 계산
                 leverage=leverage,  # 레버리지 100배
-                price=None,  # 시장가 주문
                 tp_rate=0.20,  # 목표 수익률 20%
                 sl_rate=0.20,  # 목표 손실률 20%
-                current_price = current_price # 현재 가격
-
+                current_price=current_price  # 현재 가격
             )
 
             if order_response is None:
@@ -114,9 +125,8 @@ def execute_trading():
             # 손실 발생 시 포지션 유지
             print("손실 발생 중, 포지션 유지.")
 
-    return side,decision
-            
-            
+    return side, decision
+
 # 5분마다 실행하는 함수 (schedule 라이브러리 사용)
 def schedule_trading():
     schedule.every(5).minutes.do(execute_trading)
@@ -127,7 +137,7 @@ def schedule_trading():
 
 
 if __name__ == "__main__":
-    for i in range(5):
+    for i in range(12):
         print(f"\n실행 {i+1}/5")
         side, decision = execute_trading()
         print(f"Position: {side}, Decision: {decision}")

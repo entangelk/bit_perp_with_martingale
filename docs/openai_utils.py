@@ -30,7 +30,9 @@ def ai_choice(current_price):
         messages=[
             {
                 "role": "system",
-                "content": """You are a Bitcoin perpetual futures short-term investment expert. Your goal is to use the provided technical analysis data to determine the most optimal trade direction (buy or sell) that will result in a 20% profit when using 100x leverage."""
+                "content": """You are a Bitcoin perpetual futures short-term investment expert. Your goal is to use the provided technical analysis data to determine the most optimal trade direction (buy or sell) that will result in a 20% profit when using 100x leverage. When interpreting, keep the following in mind
+
+We will be making ultra-short-term investments, so the short-term view of 1-minute and 5-minute data is more important than the long-term view. In general, 130 USDT is the target profit, so pay special attention to this. Make sure to recommend the right position direction to reach first at the current price."""
             },
             {
                 "role": "user",
@@ -62,7 +64,7 @@ def ai_choice(current_price):
                     "schema": {
                         "type": "object",
                         "properties": {
-                            "position": {"type": "string", "enum": ["buy", "sell"]},
+                            "position": {"type": "string", "enum": ["buy","stay" ,"sell"]},
                             "decision": {"type": "string"}
                         },
                         "required": ["position","decision"],
